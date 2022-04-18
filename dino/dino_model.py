@@ -39,7 +39,7 @@ class DINO(pl.LightningModule):
         self.student = Network()
         self.teacher = Network()
 
-        # disable teacher's gradients, teacher is updated by EMA of student's weigths
+        # disable teacher's gradients, teacher is updated by EMA of student's weights
         for p in self.teacher.parameters():
             p.requires_grad = False
 
@@ -47,6 +47,7 @@ class DINO(pl.LightningModule):
         student_optimizer = torch.optim.AdamW(
             self.student.parameters(), weight_decay=0.4, lr=self.lr
         )
+        # TODO: replace by correct scheduler
         lr_scheduler = LinearWarmupCosineAnnealingLR(
             student_optimizer,
             warmup_start_lr=0,
@@ -85,10 +86,14 @@ class DINO(pl.LightningModule):
             current_center = torch.cat(output["teacher_output"]).mean(dim=0)
             self.center = self.m * self.center + (1 - self.m) * current_center
 
+        self.log("train_loss", output["loss"], prog_bar=True)
+
         return output["loss"]
 
-    def validation_step(self, *args, **kwargs) -> Optional[STEP_OUTPUT]:
-        return self.common_step(*args, **kwargs)
+    def validation_step(self, *args, **kwargs):
+        output = self.common_step(*args, **kwargs)
+        self.log("val_loss", output["loss"], prog_bar=True)
+        return output
 
     @torch.no_grad()
     def on_train_batch_end(self, *args, **kwargs):

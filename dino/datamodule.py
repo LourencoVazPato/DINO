@@ -60,7 +60,17 @@ class DINODataTransform(object):
 
 
 if __name__ == "__main__":
-    dm = ImagenetDataModule(IMAGENET_PATH, meta_dir=None, num_imgs_per_val_class=50, image_size=224, num_workers=0, batch_size=32, shuffle=True, pin_memory=True, drop_last=False)
+    dm = ImagenetDataModule(
+        IMAGENET_PATH,
+        meta_dir=None,
+        num_imgs_per_val_class=50,
+        image_size=224,
+        num_workers=0,
+        batch_size=32,
+        shuffle=True,
+        pin_memory=True,
+        drop_last=False,
+    )
 
     dm.prepare_data()
     dm.setup()

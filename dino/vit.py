@@ -39,10 +39,10 @@ class Network(nn.Module):
         self.backbone = ViT(
             image_size=224,
             patch_size=16,
-            num_classes=0,
+            num_classes=1,
             dim=192,
             depth=12,
-            heads=6,
+            heads=3,
             mlp_dim=768,
             pool="cls",
             channels=3,
