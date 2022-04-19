@@ -1,21 +1,32 @@
-from typing import Optional, List
+from typing import List
 
 import pytorch_lightning as pl
 import torch
-from pl_bolts.optimizers import LinearWarmupCosineAnnealingLR
 from pytorch_lightning.utilities.types import STEP_OUTPUT
 from torch import Tensor
 
+from dino.schedulers import (
+    ConstantScheduleWithLinearWarmup,
+    CosineScheduler,
+    CosineSchedulerLinearWarmup,
+)
 from dino.vit import Network
-from dino.schedulers import ConstantScheduleWithLinearWarmup, CosineScheduler
 
 
 class DINO(pl.LightningModule):
-    def __init__(self, batch_size: int, num_steps_per_epoch: int, max_epochs: int):
+    def __init__(
+        self,
+        batch_size: int,
+        num_steps_per_epoch: int,
+        max_epochs: int,
+        lr_scheduler_warmup_epochs: int = 10,
+        num_global_crops: int = 2,
+        num_local_crops: int = 6,
+    ):
         super().__init__()
         self.save_hyperparameters()
 
-        self.lr = 0.0005 * batch_size / 256
+        self.lr = 0.0005 * self.hparams.batch_size / 256
         self.lambda_ = CosineScheduler(
             initial_value=0.996,
             final_value=1,
@@ -27,7 +38,7 @@ class DINO(pl.LightningModule):
             initial_value=0.04,
             final_value=0.07,
             num_warmup_epochs=30,
-            num_steps_per_epoch=num_steps_per_epoch,
+            num_steps_per_epoch=self.hparams.num_steps_per_epoch,
         )
         self.wd = 0.04  # TODO: cosine schedule from 0.04 to 0.1
         self.center = 0
@@ -48,11 +59,14 @@ class DINO(pl.LightningModule):
             self.student.parameters(), weight_decay=0.4, lr=self.lr
         )
         # TODO: replace by correct scheduler
-        lr_scheduler = LinearWarmupCosineAnnealingLR(
+        lr_scheduler = CosineSchedulerLinearWarmup(
             student_optimizer,
+            num_epochs=self.hparams.max_epochs,
+            initial_value=self.lr,
+            final_value=1e-6,
+            num_steps_per_epoch=self.hparams.num_steps_per_epoch,
+            num_warmup_epochs=self.hparams.lr_scheduler_warmup_epochs,
             warmup_start_lr=0,
-            warmup_epochs=10,
-            max_epochs=self.hparams.max_epochs,
         )
         scheduler = {
             "scheduler": lr_scheduler,
@@ -68,10 +82,14 @@ class DINO(pl.LightningModule):
         x, _ = args
         views, _ = x
 
-        teacher_output = self.teacher(torch.cat(views["global_views"])).chunk(2)
+        teacher_output = self.teacher(torch.cat(views["global_views"])).chunk(
+            self.hparams.num_global_crops
+        )
         student_output = self.student(torch.cat(views["global_views"])).chunk(
-            2
-        ) + self.student(torch.cat(views["local_views"])).chunk(6)
+            self.hparams.num_global_crops
+        ) + self.student(torch.cat(views["local_views"])).chunk(
+            self.hparams.num_local_crops
+        )
 
         return {
             "loss": self.loss(teacher_output, student_output),

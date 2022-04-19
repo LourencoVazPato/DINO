@@ -52,7 +52,7 @@ class Network(nn.Module):
             input_size=192,
             hidden_size=2048,
             bottleneck_size=256,
-            k=65536,
+            k=4096,
         )
 
     def forward(self, x: Tensor) -> Tensor:
