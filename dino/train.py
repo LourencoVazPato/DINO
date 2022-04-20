@@ -15,11 +15,9 @@ from dino.dino_model import DINO
 IMAGENET_PATH = "/home/pato/imagenet"
 # IMAGENET_PATH = "/Users/lourenco/Downloads/imagenet"
 
-torch.multiprocessing.set_start_method("spawn")
-
 
 MAX_EPOCHS = 100
-BATCH_SIZE = 128
+BATCH_SIZE = 64
 NUM_WORKERS = 8
 NUM_GLOBAL_CROPS = 2
 NUM_LOCAL_CROPS = 6

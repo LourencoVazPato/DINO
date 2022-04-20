@@ -132,10 +132,12 @@ class DINO(pl.LightningModule):
         loss = 0
         for i, t in enumerate(teacher_output):
             t = t.detach()  # stop gradient
+            t = t.nan_to_num(1e-6)
             t = torch.softmax(
                 (t - self.center) / self.tpt(), dim=-1
             )  # center + sharpen
             for j, s in enumerate(student_output):
+                s = s.nan_to_num(1e-6)
                 if i == j:
                     continue
                 # Compute cross-entropy loss
