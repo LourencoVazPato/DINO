@@ -40,19 +40,19 @@ class Network(nn.Module):
             image_size=224,
             patch_size=16,
             num_classes=1,
-            dim=192,
+            dim=384,
             depth=12,
-            heads=3,
+            heads=6,
             mlp_dim=768,
             pool="cls",
             channels=3,
         )
         self.backbone.mlp_head = nn.Identity()
         self.projection_head = ProjectionHead(
-            input_size=192,
+            input_size=384,
             hidden_size=2048,
             bottleneck_size=256,
-            k=4096,
+            k=2048,
         )
 
     def forward(self, x: Tensor) -> Tensor:

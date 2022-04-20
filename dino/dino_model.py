@@ -49,6 +49,7 @@ class DINO(pl.LightningModule):
         # initialize student and teacher with vision transformer
         self.student = Network()
         self.teacher = Network()
+        self.teacher.load_state_dict(self.student.state_dict())
 
         # disable teacher's gradients, teacher is updated by EMA of student's weights
         for p in self.teacher.parameters():
@@ -120,7 +121,8 @@ class DINO(pl.LightningModule):
         for param_t, param_s in zip(
             self.teacher.parameters(), self.student.parameters()
         ):
-            param_t = self.lambda_() * param_t + (1 - self.lambda_()) * param_s
+            param_t.data.mul_(self.lambda_())
+            param_t.add_((1 - self.lambda_()) * param_s.detach().data)
 
         # step param schedulers
         [scheduler.step() for scheduler in self.param_schedulers]

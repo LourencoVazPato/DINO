@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Union
 
 import torch.nn
 from PIL.Image import Image
@@ -71,10 +71,10 @@ class ImagenetDataModule(LightningDataModule):
         num_workers: int,
         pin_memory: bool,
         drop_last: bool,
-        transform: DINODataTransform,
+        transform: Union[T.Compose, torch.nn.Module],
     ):
         super().__init__()
-        self.save_hyperparameters()
+        self.save_hyperparameters(ignore=["transform"])
         self.train_dataset = datasets.ImageFolder(
             self.hparams.image_dir + "/train", transform=transform
         )
@@ -101,3 +101,19 @@ class ImagenetDataModule(LightningDataModule):
             pin_memory=self.hparams.pin_memory,
             drop_last=self.hparams.drop_last,
         )
+
+
+if __name__ == "__main__":
+    ImagenetDataModule(
+        image_dir="/Users/lourenco/Downloads/imagenette/imagenette2-320",
+        batch_size=5,
+        num_workers=8,
+        pin_memory=True,
+        drop_last=False,
+        transform=DINODataTransform(
+            global_crop_size=224,
+            local_crop_size=96,
+            num_global_crops=2,
+            num_local_crops=6,
+        ),
+    )
