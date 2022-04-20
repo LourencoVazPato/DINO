@@ -2,14 +2,12 @@ from typing import Dict, List
 
 import torch.nn
 from PIL.Image import Image
-from pl_bolts.datamodules import ImagenetDataModule
 from pl_bolts.transforms.dataset_normalizations import imagenet_normalization
+from pytorch_lightning import LightningDataModule
 from torch import Tensor
-from torchvision import transforms as T
+from torch.utils.data import DataLoader
+from torchvision import transforms as T, datasets
 from torchvision.transforms import InterpolationMode
-from torchvision.transforms.functional import to_tensor
-
-IMAGENET_PATH = "/Users/lourenco/Downloads/imagenet"
 
 
 class DINODataTransform(torch.nn.Module):
@@ -43,49 +41,63 @@ class DINODataTransform(torch.nn.Module):
         data_transforms = [
             T.RandomHorizontalFlip(p=0.5),
             T.RandomApply(
-                transforms=torch.nn.ModuleList(
-                    [
-                        T.ColorJitter(
-                            brightness=0.4, contrast=0.4, saturation=0.2, hue=0.1
-                        )
-                    ]
-                ),
+                transforms=[
+                    T.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.2, hue=0.1)
+                ],
                 p=0.8,
             ),
             T.RandomGrayscale(p=0.2),
-            T.RandomApply(
-                torch.nn.ModuleList([T.GaussianBlur(kernel_size=(23, 23))]), p=1.0
-            ),
+            T.RandomApply([T.GaussianBlur(kernel_size=(23, 23))], p=1.0),
             T.RandomSolarize(threshold=0.5, p=0),
+            T.ToTensor(),
             imagenet_normalization(),
         ]
 
         # Assemble transforms and export to TorchScript
-        self.global_transform = torch.nn.Sequential(*[global_crop] + data_transforms)
-        self.local_transform = torch.nn.Sequential(*[local_crop] + data_transforms)
-        self.global_transform = torch.jit.script(self.global_transform)
-        self.local_transform = torch.jit.script(self.local_transform)
+        self.global_transform = T.Compose([global_crop] + data_transforms)
+        self.local_transform = T.Compose([local_crop] + data_transforms)
 
     def __call__(self, im: Image) -> Dict[str, List[Tensor]]:
-        im = to_tensor(im)
         global_views = [self.global_transform(im) for _ in range(self.num_global_crops)]
         local_views = [self.local_transform(im) for _ in range(self.num_local_crops)]
         return {"global_views": global_views, "local_views": local_views}
 
 
-if __name__ == "__main__":
-    dm = ImagenetDataModule(
-        IMAGENET_PATH,
-        meta_dir=None,
-        num_imgs_per_val_class=50,
-        image_size=224,
-        num_workers=0,
-        batch_size=32,
-        shuffle=True,
-        pin_memory=True,
-        drop_last=False,
-    )
+class ImagenetDataModule(LightningDataModule):
+    def __init__(
+        self,
+        image_dir: str,
+        batch_size: int,
+        num_workers: int,
+        pin_memory: bool,
+        drop_last: bool,
+        transform: DINODataTransform,
+    ):
+        super().__init__()
+        self.save_hyperparameters()
+        self.train_dataset = datasets.ImageFolder(
+            self.hparams.image_dir + "/train", transform=transform
+        )
+        self.val_dataset = datasets.ImageFolder(
+            self.hparams.image_dir + "/val", transform=transform
+        )
 
-    dm.prepare_data()
-    dm.setup()
-    print(dm)
+    def train_dataloader(self):
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.hparams.batch_size,
+            num_workers=self.hparams.num_workers,
+            shuffle=True,
+            pin_memory=self.hparams.pin_memory,
+            drop_last=self.hparams.drop_last,
+        )
+
+    def val_dataloader(self):
+        return DataLoader(
+            self.val_dataset,
+            batch_size=self.hparams.batch_size,
+            num_workers=self.hparams.num_workers,
+            shuffle=False,
+            pin_memory=self.hparams.pin_memory,
+            drop_last=self.hparams.drop_last,
+        )

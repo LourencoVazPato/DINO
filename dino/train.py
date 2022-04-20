@@ -1,6 +1,4 @@
 import pytorch_lightning as pl
-import torch
-from pl_bolts.datamodules import ImagenetDataModule
 from pytorch_lightning.callbacks import (
     LearningRateMonitor,
     GPUStatsMonitor,
@@ -9,11 +7,10 @@ from pytorch_lightning.callbacks import (
 )
 from pytorch_lightning.loggers import MLFlowLogger
 
-from dino.datamodule import DINODataTransform
+from dino.datamodule import DINODataTransform, ImagenetDataModule
 from dino.dino_model import DINO
 
 IMAGENET_PATH = "/home/pato/imagenet"
-# IMAGENET_PATH = "/Users/lourenco/Downloads/imagenet"
 
 
 MAX_EPOCHS = 100
@@ -27,20 +24,17 @@ if __name__ == "__main__":
     pl.seed_everything(42)
 
     # data
-    datamodule = ImagenetDataModule(
-        IMAGENET_PATH,
-        num_workers=NUM_WORKERS,
-        batch_size=BATCH_SIZE,
-        pin_memory=True,
-        drop_last=False,
-    )
-
-    # transforms
     transform = DINODataTransform(
         num_global_crops=NUM_GLOBAL_CROPS, num_local_crops=NUM_LOCAL_CROPS
     )
-    datamodule.train_transforms = transform
-    datamodule.val_transforms = transform
+    datamodule = ImagenetDataModule(
+        IMAGENET_PATH,
+        batch_size=BATCH_SIZE,
+        num_workers=NUM_WORKERS,
+        pin_memory=True,
+        drop_last=False,
+        transform=transform,
+    )
     datamodule.prepare_data()
     datamodule.setup()
 
@@ -65,7 +59,7 @@ if __name__ == "__main__":
             GPUStatsMonitor(memory_utilization=True, gpu_utilization=True),
             LearningRateMonitor(logging_interval="step"),
             ModelCheckpoint(save_top_k=3, monitor="val_loss", mode="min", verbose=True),
-            ModelSummary(max_depth=3),
+            ModelSummary(max_depth=2),
         ],
         limit_train_batches=1.0,
         log_every_n_steps=50,

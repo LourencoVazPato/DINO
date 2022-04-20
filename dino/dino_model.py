@@ -26,7 +26,7 @@ class DINO(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
-        self.lr = 0.0005 * self.hparams.batch_size / 256
+        self.lr = 0.0005 * batch_size / 256
         self.lambda_ = CosineScheduler(
             initial_value=0.996,
             final_value=1,
@@ -38,7 +38,7 @@ class DINO(pl.LightningModule):
             initial_value=0.04,
             final_value=0.07,
             num_warmup_epochs=30,
-            num_steps_per_epoch=self.hparams.num_steps_per_epoch,
+            num_steps_per_epoch=num_steps_per_epoch,
         )
         self.wd = 0.04  # TODO: cosine schedule from 0.04 to 0.1
         self.center = 0
@@ -58,7 +58,6 @@ class DINO(pl.LightningModule):
         student_optimizer = torch.optim.AdamW(
             self.student.parameters(), weight_decay=0.4, lr=self.lr
         )
-        # TODO: replace by correct scheduler
         lr_scheduler = CosineSchedulerLinearWarmup(
             student_optimizer,
             num_epochs=self.hparams.max_epochs,
@@ -132,12 +131,10 @@ class DINO(pl.LightningModule):
         loss = 0
         for i, t in enumerate(teacher_output):
             t = t.detach()  # stop gradient
-            t = t.nan_to_num(1e-6)
             t = torch.softmax(
                 (t - self.center) / self.tpt(), dim=-1
             )  # center + sharpen
             for j, s in enumerate(student_output):
-                s = s.nan_to_num(1e-6)
                 if i == j:
                     continue
                 # Compute cross-entropy loss
