@@ -11,8 +11,6 @@ from pytorch_lightning.loggers import MLFlowLogger
 from dino.datamodule import DINODataTransform, ImagenetDataModule, eval_transform
 from dino.dino_model import DINO
 
-IMAGENET_PATH = "/home/pato/imagenet"
-IMAGENETTE_PATH = "/home/pato/imagenette2-320"
 MAX_EPOCHS = 100
 BATCH_SIZE = 64
 NUM_WORKERS = 8
@@ -22,7 +20,7 @@ SEED = 42
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", type=str, default=IMAGENET_PATH)
+    parser.add_argument("--dataset", type=str)
     parser.add_argument("--batch_size", type=int, default=BATCH_SIZE)
     parser.add_argument("--num_workers", type=int, default=NUM_WORKERS)
     parser.add_argument("--num_global_crops", type=int, default=NUM_GLOBAL_CROPS)
