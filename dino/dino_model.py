@@ -1,10 +1,11 @@
-from typing import List
+from typing import List, Optional
 
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.utilities.types import STEP_OUTPUT
 from torch import Tensor
 
+from dino.knn import compute_knn
 from dino.schedulers import (
     ConstantScheduleWithLinearWarmup,
     CosineScheduler,
@@ -22,9 +23,11 @@ class DINO(pl.LightningModule):
         lr_scheduler_warmup_epochs: int = 10,
         num_global_crops: int = 2,
         num_local_crops: int = 6,
+        eval_datamodule: Optional[pl.LightningDataModule] = None,
     ):
         super().__init__()
-        self.save_hyperparameters()
+        self.save_hyperparameters(ignore=["eval_datamodule"])
+        self.eval_datamodule = eval_datamodule
 
         self.lr = 0.0005 * batch_size / 256
         self.lambda_ = CosineScheduler(
@@ -76,7 +79,7 @@ class DINO(pl.LightningModule):
         return [student_optimizer], [scheduler]
 
     def forward(self, x: Tensor) -> Tensor:
-        return self.teacher(x)
+        return self.teacher.backbone(x)
 
     def common_step(self, *args, **kwargs) -> STEP_OUTPUT:
         x, _ = args
@@ -112,6 +115,17 @@ class DINO(pl.LightningModule):
         output = self.common_step(*args, **kwargs)
         self.log("val_loss", output["loss"], prog_bar=True)
         return output
+
+    def on_validation_epoch_end(self) -> None:
+        if self.eval_datamodule:
+            teacher_knn_acc = compute_knn(
+                self.teacher.backbone, self.eval_datamodule, k=20, device=self.device
+            )
+            student_knn_acc = compute_knn(
+                self.student.backbone, self.eval_datamodule, k=20, device=self.device
+            )
+            self.log("val_teacher_knn_acc", teacher_knn_acc, prog_bar=True)
+            self.log("val_student_knn_acc", student_knn_acc, prog_bar=True)
 
     @torch.no_grad()
     def on_train_batch_end(self, *args, **kwargs):

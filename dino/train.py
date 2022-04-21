@@ -3,13 +3,12 @@ import argparse
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import (
     LearningRateMonitor,
-    GPUStatsMonitor,
     ModelCheckpoint,
     ModelSummary,
 )
 from pytorch_lightning.loggers import MLFlowLogger
 
-from dino.datamodule import DINODataTransform, ImagenetDataModule
+from dino.datamodule import DINODataTransform, ImagenetDataModule, eval_transform
 from dino.dino_model import DINO
 
 IMAGENET_PATH = "/home/pato/imagenet"
@@ -49,6 +48,15 @@ if __name__ == "__main__":
     datamodule.prepare_data()
     datamodule.setup()
 
+    eval_datamodule = ImagenetDataModule(
+        image_dir=args.dataset,
+        batch_size=2 * args.batch_size,
+        num_workers=args.num_workers,
+        pin_memory=True,
+        drop_last=False,
+        transform=eval_transform,
+    )
+
     # model
     dino = DINO(
         batch_size=args.batch_size,
@@ -56,6 +64,7 @@ if __name__ == "__main__":
         max_epochs=args.max_epochs,
         num_global_crops=args.num_global_crops,
         num_local_crops=args.num_local_crops,
+        eval_datamodule=eval_datamodule,
     )
 
     # trainer
@@ -68,7 +77,6 @@ if __name__ == "__main__":
         gradient_clip_val=3.0,
         logger=MLFlowLogger(experiment_name="DINO_ViT_S_Imagenette"),
         callbacks=[
-            GPUStatsMonitor(memory_utilization=True, gpu_utilization=True),
             LearningRateMonitor(logging_interval="step"),
             ModelCheckpoint(save_top_k=5, monitor="val_loss", mode="min", verbose=True),
             ModelSummary(max_depth=2),

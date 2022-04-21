@@ -10,6 +10,16 @@ from torchvision import transforms as T, datasets
 from torchvision.transforms import InterpolationMode
 
 
+eval_transform = T.Compose(
+    [
+        T.Resize(size=256, interpolation=InterpolationMode.BICUBIC),
+        T.CenterCrop(size=224),
+        T.ToTensor(),
+        imagenet_normalization(),
+    ]
+)
+
+
 class DINODataTransform(torch.nn.Module):
     def __init__(
         self,
